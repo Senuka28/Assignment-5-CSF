@@ -19,7 +19,22 @@ struct Message {
   Message(const std::string &tag, const std::string &data)
     : tag(tag), data(data) { }
 
-  // TODO: you could add helper functions
+  std::string encode() const {
+    std::ostringstream oss;
+    oss << tag << ":" << data << "\n";
+    return oss.str();
+  }
+
+  bool decode(const std::string &raw) {
+    size_t sep = raw.find(':');
+    if (sep == std::string::npos)
+      return false;
+    tag = raw.substr(0, sep);
+    data = raw.substr(sep + 1);
+    while (!data.empty() && (data.back() == '\n' || data.back() == '\r'))
+      data.pop_back();
+    return true;
+  }
 };
 
 // standard message tags (note that you don't need to worry about
