@@ -26,21 +26,89 @@
 
 namespace {
 
+void chat_with_sender(Server *server, Connection *conn, User *user) {
+  Message msg;
+  Room *current_room = nullptr;  // track which room the sender is in
+
+  while (conn->receive(msg)) {
+    if (msg.tag == TAG_JOIN) {
+      current_room = server->find_or_create_room(msg.data);
+      current_room->add_member(user);
+      conn->send(Message(TAG_OK, "joined " + msg.data));
+    } 
+    else if (msg.tag == TAG_LEAVE) {
+      if (current_room) {
+        current_room->remove_member(user);
+        conn->send(Message(TAG_OK, "left"));
+        current_room = nullptr;
+      } else {
+        conn->send(Message(TAG_ERR, "not in any room"));
+      }
+    } 
+    else if (msg.tag == TAG_SENDALL) {
+      if (current_room) {
+        current_room->broadcast_message(user->username, msg.data);
+        conn->send(Message(TAG_OK, "delivered"));
+      } else {
+        conn->send(Message(TAG_ERR, "not in a room"));
+      }
+    } 
+    else if (msg.tag == TAG_QUIT) {
+      if (current_room) {
+        current_room->remove_member(user);
+      }
+      conn->send(Message(TAG_OK, "bye"));
+      break;
+    } 
+    else {
+      conn->send(Message(TAG_ERR, "unknown command"));
+    }
+  }
+}
+
+void chat_with_receiver(Server *server, Connection *conn, User *user) {
+  Message *msg;
+  while (true) {
+    msg = user->mqueue.dequeue();
+    if (!msg) {
+      if (!conn->send(Message(TAG_EMPTY, ""))) break;
+    } else {
+      if (!conn->send(*msg)) break;
+      delete msg;
+    }
+  }
+}
+
+
 void *worker(void *arg) {
   pthread_detach(pthread_self());
 
-  // TODO: use a static cast to convert arg from a void* to
-  //       whatever pointer type describes the object(s) needed
-  //       to communicate with a client (sender or receiver)
+  // cast arg to connection
+  Connection *conn = static_cast<Connection *>(arg);
+  Message msg;
 
-  // TODO: read login message (should be tagged either with
-  //       TAG_SLOGIN or TAG_RLOGIN), send response
+  if (!conn->receive(msg)) {
+    delete conn;
+    return nullptr;
+  }
 
-  // TODO: depending on whether the client logged in as a sender or
-  //       receiver, communicate with the client (implementing
-  //       separate helper functions for each of these possibilities
-  //       is a good idea)
+  if (msg.tag == TAG_SLOGIN) {
+    // sender login
+    User *user = new User(msg.data);
+    conn->send(Message(TAG_OK, "logged in as sender"));
+    chat_with_sender(Server::get_instance(), conn, user);
+    delete user;
+  } else if (msg.tag == TAG_RLOGIN) {
+    // receiver login
+    User *user = new User(msg.data);
+    conn->send(Message(TAG_OK, "logged in as receiver"));
+    chat_with_receiver(Server::get_instance(), conn, user);
+    delete user;
+  } else {
+    conn->send(Message(TAG_ERR, "expected login"));
+  }
 
+  delete conn;
   return nullptr;
 }
 
@@ -49,28 +117,42 @@ void *worker(void *arg) {
 ////////////////////////////////////////////////////////////////////////
 // Server member function implementation
 ////////////////////////////////////////////////////////////////////////
+Server *Server::m_instance = nullptr;
 
 Server::Server(int port)
   : m_port(port)
   , m_ssock(-1) {
-  // TODO: initialize mutex
+  pthread_mutex_init(&m_lock, nullptr); // init server mutex
+  m_instance = this; // store static instance for threads
 }
 
 Server::~Server() {
   // TODO: destroy mutex
+  pthread_mutex_destroy(&m_lock);
 }
 
 bool Server::listen() {
-  // TODO: use open_listenfd to create the server socket, return true
-  //       if successful, false if not
+  m_ssock = open_listenfd(std::to_string(m_port).c_str());
+  return m_ssock >= 0; // true if socket created fine
 }
 
 void Server::handle_client_requests() {
-  // TODO: infinite loop calling accept or Accept, starting a new
-  //       pthread for each connected client
+  while (true) {
+    int client_fd = Accept(m_ssock, nullptr, nullptr);
+    if (client_fd < 0) continue;
+    Connection *conn = new Connection(client_fd);
+    pthread_t th;
+    pthread_create(&th, nullptr, worker, conn); // create a new thread
+  }
 }
 
 Room *Server::find_or_create_room(const std::string &room_name) {
-  // TODO: return a pointer to the unique Room object representing
-  //       the named chat room, creating a new one if necessary
+  Guard g(m_lock);
+  auto it = m_rooms.find(room_name);
+  if (it != m_rooms.end()) {
+    return it->second;
+  }
+  Room *r = new Room(room_name);
+  m_rooms[room_name] = r;
+  return r;
 }
