@@ -19,7 +19,6 @@ public:
 
   typedef std::map<std::string, Room *> RoomMap;
   RoomMap &get_rooms() { return m_rooms; } // gives read/write access to rooms
-  static Server *get_instance() { return m_instance; }
 
 
 private:
@@ -34,8 +33,6 @@ private:
   int m_ssock;
   RoomMap m_rooms;
   pthread_mutex_t m_lock;
-
-  //static Server *m_instance;
 
 };
 

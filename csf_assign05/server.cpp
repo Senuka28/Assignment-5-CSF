@@ -17,6 +17,11 @@
 // Server implementation data types
 ////////////////////////////////////////////////////////////////////////
 
+struct ThreadArgs {
+  Server *server;
+  Connection *conn;
+};
+
 // TODO: add any additional data types that might be helpful
 //       for implementing the Server member functions
 
@@ -83,26 +88,26 @@ void chat_with_receiver(Server *server, Connection *conn, User *user) {
 void *worker(void *arg) {
   pthread_detach(pthread_self());
 
-  // cast arg to connection
-  Connection *conn = static_cast<Connection *>(arg);
-  Message msg;
+  ThreadArgs *args = static_cast<ThreadArgs *>(arg);
+  Server *server = args->server;
+  Connection *conn = args->conn;
+  delete args; 
 
+  Message msg;
   if (!conn->receive(msg)) {
     delete conn;
     return nullptr;
   }
 
   if (msg.tag == TAG_SLOGIN) {
-    // sender login
     User *user = new User(msg.data);
     conn->send(Message(TAG_OK, "logged in as sender"));
-    chat_with_sender(Server::get_instance(), conn, user);
+    chat_with_sender(server, conn, user);
     delete user;
   } else if (msg.tag == TAG_RLOGIN) {
-    // receiver login
     User *user = new User(msg.data);
     conn->send(Message(TAG_OK, "logged in as receiver"));
-    chat_with_receiver(Server::get_instance(), conn, user);
+    chat_with_receiver(server, conn, user);
     delete user;
   } else {
     conn->send(Message(TAG_ERR, "expected login"));
@@ -117,13 +122,11 @@ void *worker(void *arg) {
 ////////////////////////////////////////////////////////////////////////
 // Server member function implementation
 ////////////////////////////////////////////////////////////////////////
-Server *Server::m_instance = nullptr;
 
 Server::Server(int port)
   : m_port(port)
   , m_ssock(-1) {
   pthread_mutex_init(&m_lock, nullptr); // init server mutex
-  m_instance = this; // store static instance for threads
 }
 
 Server::~Server() {
@@ -140,9 +143,11 @@ void Server::handle_client_requests() {
   while (true) {
     int client_fd = Accept(m_ssock, nullptr, nullptr);
     if (client_fd < 0) continue;
+    
     Connection *conn = new Connection(client_fd);
+    ThreadArgs *args = new ThreadArgs{this, conn};
     pthread_t th;
-    pthread_create(&th, nullptr, worker, conn); // create a new thread
+    pthread_create(&th, nullptr, worker, args); // create a new thread
   }
 }
 
