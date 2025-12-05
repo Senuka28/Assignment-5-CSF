@@ -17,8 +17,10 @@ MessageQueue::~MessageQueue() {
 
 void MessageQueue::enqueue(Message *msg) {
   // TODO: put the specified message on the queue
-  Guard g(m_lock);
+  //Guard g(m_lock);
+  pthread_mutex_lock(&m_lock);
   m_messages.push_back(msg); // push new msg
+  pthread_mutex_unlock(&m_lock);
   sem_post(&m_avail); // notify waiting threads
   // be sure to notify any thread waiting for a message to be
   // available by calling sem_post
@@ -38,15 +40,17 @@ Message *MessageQueue::dequeue() {
 
   // TODO: call sem_timedwait to wait up to 1 second for a message
   //       to be available, return nullptr if no message is available
-  if (sem_timedwait(&m_avail, &ts) == -1) {
+  if (sem_timedwait(&m_avail, &ts) != 0) {
     return nullptr; // timeout, no message
   }
 
   // TODO: remove the next message from the queue, return it
   
-  Guard g(m_lock);
-  if (m_messages.empty()) return nullptr;
+  //Guard g(m_lock);
+  //if (m_messages.empty()) return nullptr;
+  pthread_mutex_lock(&m_lock);
   Message *msg = m_messages.front();
   m_messages.pop_front();
+  pthread_mutex_unlock(&m_lock);
   return msg;
 }
