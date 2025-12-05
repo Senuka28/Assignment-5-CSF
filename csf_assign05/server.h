@@ -35,7 +35,7 @@ private:
   RoomMap m_rooms;
   pthread_mutex_t m_lock;
 
-  static Server *m_instance;
+  //static Server *m_instance;
 
 };
 

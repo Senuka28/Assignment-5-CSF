@@ -29,7 +29,6 @@ private:
   typedef std::set<User *> UserSet;
   UserSet members;
 
-  pthread_mutex_t m_lock;
 };
 
 #endif // ROOM_H
