@@ -11,30 +11,30 @@ class Room;
 
 class Server {
 public:
-    Server(int port);
-    ~Server();
+  Server(int port);
+  ~Server();
 
-    bool listen();
-    void handle_client_requests();
+  bool listen();
+  void handle_client_requests();
 
-    struct client_info {
-        int sockfd;
-        char role;
-        std::string uname;
-        Connection* conn;
-        pthread_t tid;
-        Room* room;
-        User* user;
-        client_info() :
-            sockfd(-1), role('?'),
-            conn(nullptr), tid(0),
-            room(nullptr), user(nullptr) {}
-    };
+  struct client_info {
+    int sockfd;
+    char role;
+    std::string uname;
+    Connection* conn;
+    pthread_t tid;
+    Room* room;
+    User* user;
+    client_info() :
+      sockfd(-1), role('?'),
+      conn(nullptr), tid(0),
+      room(nullptr), user(nullptr) {}
+  };
 
-    void chat_with_sender(client_info* c);
-    void chat_with_receiver(client_info* c);
+  void chat_with_sender(client_info* c);
+  void chat_with_receiver(client_info* c);
 
-    Room* find_or_create_room(const std::string& room_name);
+  Room* find_or_create_room(const std::string& room_name);
 
 private:
   // prohibit value semantics
