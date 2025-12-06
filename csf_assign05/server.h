@@ -4,10 +4,10 @@
 #include <map>
 #include <string>
 #include <pthread.h>
-#include "connection.h"
-#include "user.h"
 
 class Room;
+class Connection;
+class User;
 
 class Server {
 public:
@@ -17,18 +17,19 @@ public:
   bool listen();
   void handle_client_requests();
 
+  // unified client struct
   struct client_info {
-    int sockfd;
-    char role;
-    std::string uname;
-    Connection* conn;
-    pthread_t tid;
-    Room* room;
-    User* user;
-    client_info() :
-      sockfd(-1), role('?'),
-      conn(nullptr), tid(0),
-      room(nullptr), user(nullptr) {}
+      int sockfd;
+      char role;
+      std::string uname;
+      Connection* conn;
+      pthread_t tid;
+      Room* room;
+      User* user;
+      client_info() :
+        sockfd(-1), role('?'),
+        conn(nullptr), tid(0),
+        room(nullptr), user(nullptr) {}
   };
 
   void chat_with_sender(client_info* c);
@@ -38,10 +39,10 @@ public:
 
 private:
   // prohibit value semantics
-  Server(const Server &);
-  Server &operator=(const Server &);
+  Server(const Server&) = delete;
+  Server& operator=(const Server&) = delete;
 
-  typedef std::map<std::string, Room *> RoomMap;
+  using RoomMap = std::map<std::string, Room*>;
 
   // These member variables are sufficient for implementing
   // the server operations
