@@ -4,36 +4,51 @@
 #include <map>
 #include <string>
 #include <pthread.h>
+#include "connection.h"
+#include "user.h"
+
 class Room;
 
 class Server {
 public:
-  Server(int port);
-  ~Server();
+    Server(int port);
+    ~Server();
 
-  bool listen();
+    bool listen();
+    void handle_client_requests();
 
-  void handle_client_requests();
+    struct client_info {
+        int sockfd;
+        char role;
+        std::string uname;
+        Connection* conn;
+        pthread_t tid;
+        Room* room;
+        User* user;
+        client_info() :
+            sockfd(-1), role('?'),
+            conn(nullptr), tid(0),
+            room(nullptr), user(nullptr) {}
+    };
 
-  Room *find_or_create_room(const std::string &room_name);
+    void chat_with_sender(client_info* c);
+    void chat_with_receiver(client_info* c);
 
-  typedef std::map<std::string, Room *> RoomMap;
-  RoomMap &get_rooms() { return m_rooms; } // gives read/write access to rooms
-
+    Room* find_or_create_room(const std::string& room_name);
 
 private:
   // prohibit value semantics
   Server(const Server &);
   Server &operator=(const Server &);
 
-  
+  typedef std::map<std::string, Room *> RoomMap;
+
   // These member variables are sufficient for implementing
   // the server operations
   int m_port;
   int m_ssock;
   RoomMap m_rooms;
   pthread_mutex_t m_lock;
-
 };
 
-#endif // SERVER_H
+#endif
